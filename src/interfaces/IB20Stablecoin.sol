@@ -12,4 +12,23 @@ interface IB20Stablecoin is IB20 {
     ///         immutable thereafter. Uppercase ASCII letters (`A`–`Z`);
     ///         self-declared and not verified by the contract.
     function currency() external view returns (string memory);
+
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Emitted when the reserve URI is updated.
+    event ReserveURIUpdated();
+
+    /*//////////////////////////////////////////////////////////////
+                           RESERVE ATTESTATION
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the URI pointing to off-chain proof-of-reserves
+    ///         data. Returns the empty string if not set.
+    function reserveURI() external view returns (string memory);
+
+    /// @notice Updates the reserve URI. Requires `METADATA_ROLE`.
+    ///         Emits `ReserveURIUpdated`.
+    function updateReserveURI(string calldata newURI) external;
 }

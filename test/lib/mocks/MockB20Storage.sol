@@ -511,6 +511,8 @@ library MockB20StablecoinStorage {
         // mutator function. Stored at the type's natural Solidity slot
         // within this struct.
         string currency;
+        // Mutable off-chain pointer to proof-of-reserves data.
+        string reserveURI;
     }
 
     // keccak256(abi.encode(uint256(keccak256("base.b20.stablecoin")) - 1)) & ~bytes32(uint256(0xff))
@@ -519,6 +521,9 @@ library MockB20StablecoinStorage {
 
     /// @notice Offset of `currency` within `Layout`. Always 0 (single-field struct).
     uint256 internal constant CURRENCY_OFFSET = 0;
+
+    /// @notice Offset of `reserveURI` within `Layout`.
+    uint256 internal constant RESERVE_URI_OFFSET = 1;
 
     /// @notice Absolute slot for a top-level field of `Layout`.
     function slotOf(uint256 offset) internal pure returns (bytes32) {
@@ -549,4 +554,7 @@ library MockB20StablecoinStorage {
     ///         starts at `keccak256(slot)`).
     // forgefmt: disable-next-item
     function currencySlot() internal pure returns (bytes32) { return slotOf(CURRENCY_OFFSET); }
+
+    /// @dev Convenience helper: `slotOf(RESERVE_URI_OFFSET)`.
+    function reserveURISlot() internal pure returns (bytes32) { return slotOf(RESERVE_URI_OFFSET); }
 }
