@@ -20,7 +20,7 @@ contract B20SecurityBatchMintTest is B20SecurityTest {
         amounts[1] = 2;
 
         vm.expectRevert(abi.encodeWithSelector(IB20Security.LengthMismatch.selector, uint256(1), uint256(2)));
-        security().batchMint(recipients, amounts);
+        security().batchMint(recipients, amounts, 3);
     }
 
     /// @notice Verifies batchMint reverts when both arrays are empty
@@ -28,7 +28,17 @@ contract B20SecurityBatchMintTest is B20SecurityTest {
     ///      log stream meaningful.
     function test_batchMint_revert_emptyBatch() public {
         vm.expectRevert(IB20Security.EmptyBatch.selector);
-        security().batchMint(new address[](0), new uint256[](0));
+        security().batchMint(new address[](0), new uint256[](0), 0);
+    }
+
+    /// @notice Verifies batchMint reverts when totalAmount does not match the sum of amounts
+    /// @dev TotalAmountMismatch guard: provides defense in depth against caller-side math errors.
+    function test_batchMint_revert_totalAmountMismatch() public {
+        address[] memory recipients = _singletonAddresses(alice);
+        uint256[] memory amounts = _singletonUints(100);
+
+        vm.expectRevert(abi.encodeWithSelector(IB20Security.TotalAmountMismatch.selector, uint256(99), uint256(100)));
+        security().batchMint(recipients, amounts, 99);
     }
 
     /// @notice Verifies batchMint surfaces _mint's role-check revert when caller lacks MINT_ROLE
@@ -48,7 +58,7 @@ contract B20SecurityBatchMintTest is B20SecurityTest {
         vm.expectRevert(
             abi.encodeWithSelector(IB20.AccessControlUnauthorizedAccount.selector, caller, B20Constants.MINT_ROLE)
         );
-        security().batchMint(recipients, amounts);
+        security().batchMint(recipients, amounts, amount);
     }
 
     /// @notice Verifies batchMint surfaces _mint's pause revert when MINT is paused
@@ -60,7 +70,7 @@ contract B20SecurityBatchMintTest is B20SecurityTest {
 
         vm.prank(minter);
         vm.expectRevert(abi.encodeWithSelector(IB20.ContractPaused.selector, IB20.PausableFeature.MINT));
-        security().batchMint(_singletonAddresses(to), _singletonUints(amount));
+        security().batchMint(_singletonAddresses(to), _singletonUints(amount), amount);
     }
 
     /// @notice Verifies batchMint surfaces _mint's policy revert when MINT_RECEIVER_POLICY forbids
@@ -77,7 +87,7 @@ contract B20SecurityBatchMintTest is B20SecurityTest {
                 IB20.PolicyForbids.selector, B20Constants.MINT_RECEIVER_POLICY, PolicyRegistryConstants.ALWAYS_BLOCK_ID
             )
         );
-        security().batchMint(_singletonAddresses(to), _singletonUints(amount));
+        security().batchMint(_singletonAddresses(to), _singletonUints(amount), amount);
     }
 
     /// @notice Verifies batchMint surfaces _mint's supply-cap revert when accumulated mints exceed cap
@@ -102,7 +112,7 @@ contract B20SecurityBatchMintTest is B20SecurityTest {
 
         vm.prank(minter);
         vm.expectRevert(abi.encodeWithSelector(IB20.SupplyCapExceeded.selector, uint256(100), uint256(120)));
-        security().batchMint(recipients, amounts);
+        security().batchMint(recipients, amounts, 120);
     }
 
     /// @notice Verifies batchMint succeeds with a single recipient and credits the balance
@@ -116,7 +126,7 @@ contract B20SecurityBatchMintTest is B20SecurityTest {
         uint256 balanceBefore = token.balanceOf(to);
 
         vm.prank(minter);
-        security().batchMint(_singletonAddresses(to), _singletonUints(amount));
+        security().batchMint(_singletonAddresses(to), _singletonUints(amount), amount);
 
         assertEq(token.balanceOf(to), balanceBefore + amount, "balance must increase by amount");
         assertEq(token.totalSupply(), supplyBefore + amount, "totalSupply must increase by amount");
@@ -140,7 +150,7 @@ contract B20SecurityBatchMintTest is B20SecurityTest {
         uint256 supplyBefore = token.totalSupply();
 
         vm.prank(minter);
-        security().batchMint(recipients, amounts);
+        security().batchMint(recipients, amounts, uint256(a1) + uint256(a2) + uint256(a3));
 
         assertEq(token.balanceOf(recipients[0]), amounts[0], "recipient[0] balance must equal amounts[0]");
         assertEq(token.balanceOf(recipients[1]), amounts[1], "recipient[1] balance must equal amounts[1]");
@@ -169,6 +179,6 @@ contract B20SecurityBatchMintTest is B20SecurityTest {
         vm.expectEmit(true, true, false, true, address(token));
         emit IB20.Transfer(address(0), bob, 200);
         vm.prank(minter);
-        security().batchMint(recipients, amounts);
+        security().batchMint(recipients, amounts, 300);
     }
 }

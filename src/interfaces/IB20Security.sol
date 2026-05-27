@@ -128,6 +128,11 @@ interface IB20Security is IB20 {
     ///         transaction.
     error EmptyBatch();
 
+    /// @notice A batched function (`batchMint`, `batchBurn`) was called
+    ///         with a `totalAmount` that does not match the sum of the
+    ///         `amounts` array.
+    error TotalAmountMismatch(uint256 expected, uint256 actual);
+
     /// @notice `redeem` / `redeemWithMemo` was called with an `amount`
     ///         that resolves to a share count below the active redemption
     ///         floor. `shares` is the computed share count
@@ -186,20 +191,21 @@ interface IB20Security is IB20 {
 
     /// @notice Emitted by `announce` when a holder-impacting disclosure
     ///         is posted. Indexers join this with subsequent
-    ///         security-token state changes via `id`.
-    event Announcement(address indexed caller, string id, string description, string uri);
+    ///         security-token state changes via `id`. `idHash` is
+    ///         `keccak256(bytes(id))` for bloom-filter efficiency.
+    event Announcement(address indexed caller, bytes32 indexed idHash, string id, string description, string uri);
 
     /// @notice Emitted by `announce` immediately after every entry in
     ///         `internalCalls` has executed successfully (or
     ///         immediately after `Announcement` itself for a pure
     ///         announcement with `internalCalls.length == 0`).
-    ///         Carries the same `id` as the paired `Announcement` so
-    ///         indexers can join start ↔ end on the id even when
-    ///         scanning logs in isolation. The recursion guard
-    ///         (`AnnouncementInProgress`) makes the pairing
+    ///         Carries the same `id` and `idHash` as the paired
+    ///         `Announcement` so indexers can join start ↔ end on the
+    ///         id even when scanning logs in isolation. The recursion
+    ///         guard (`AnnouncementInProgress`) makes the pairing
     ///         within-tx unambiguous; the `id` field hardens cross-tx
     ///         indexing as well.
-    event EndAnnouncement(string id);
+    event EndAnnouncement(bytes32 indexed idHash, string id);
 
     /*//////////////////////////////////////////////////////////////
                             ROLE IDENTIFIERS
@@ -377,8 +383,10 @@ interface IB20Security is IB20 {
     /// @dev    Requires `MINT_ROLE`. Subject to the `MINT_RECEIVER_POLICY`
     ///         policy per recipient and to the `MINT` pause vector.
     ///         Reverts with `LengthMismatch(recipients.length,
-    ///         amounts.length)` if the parallel arrays disagree, and
-    ///         with `EmptyBatch()` if either array is empty.
+    ///         amounts.length)` if the parallel arrays disagree,
+    ///         with `EmptyBatch()` if either array is empty, and
+    ///         with `TotalAmountMismatch(totalAmount, sum)` if the sum
+    ///         of `amounts` does not match `totalAmount`.
     ///         All-or-nothing: if any element reverts (e.g.
     ///         `SupplyCapExceeded` after a partial accumulation, or
     ///         `PolicyForbids(MINT_RECEIVER_POLICY, ...)` for a
@@ -393,10 +401,11 @@ interface IB20Security is IB20 {
     ///         for emergency override but produces no `Announcement` /
     ///         `EndAnnouncement` bracket.
     ///
-    /// @param  recipients Accounts receiving the minted tokens.
-    /// @param  amounts    Per-recipient amounts, parallel to
-    ///                    `recipients`.
-    function batchMint(address[] calldata recipients, uint256[] calldata amounts) external;
+    /// @param  recipients  Accounts receiving the minted tokens.
+    /// @param  amounts     Per-recipient amounts, parallel to
+    ///                     `recipients`.
+    /// @param  totalAmount Expected sum of `amounts` for safety check.
+    function batchMint(address[] calldata recipients, uint256[] calldata amounts, uint256 totalAmount) external;
 
     /// @notice Burns `amounts[i]` tokens from `accounts[i]`. Distinct
     ///         from the inherited `IB20.burnBlocked(address,uint256)`:
@@ -415,8 +424,10 @@ interface IB20Security is IB20 {
     ///         set of accounts off-chain, and the role grant is the
     ///         on-chain authorization. Subject to the `BURN` pause
     ///         vector. Reverts with `LengthMismatch(accounts.length,
-    ///         amounts.length)` if the parallel arrays disagree, and
-    ///         with `EmptyBatch()` if either array is empty.
+    ///         amounts.length)` if the parallel arrays disagree,
+    ///         with `EmptyBatch()` if either array is empty, and
+    ///         with `TotalAmountMismatch(totalAmount, sum)` if the sum
+    ///         of `amounts` does not match `totalAmount`.
     ///         All-or-nothing: if any element reverts (e.g.
     ///         `InsufficientBalance(accounts[k], balance, amounts[k])`),
     ///         the entire transaction reverts and no partial state is
@@ -431,9 +442,10 @@ interface IB20Security is IB20 {
     ///         emergency override but produces no `Announcement` /
     ///         `EndAnnouncement` bracket.
     ///
-    /// @param  accounts Accounts whose balances will be debited.
-    /// @param  amounts  Per-account amounts, parallel to `accounts`.
-    function batchBurn(address[] calldata accounts, uint256[] calldata amounts) external;
+    /// @param  accounts    Accounts whose balances will be debited.
+    /// @param  amounts     Per-account amounts, parallel to `accounts`.
+    /// @param  totalAmount Expected sum of `amounts` for safety check.
+    function batchBurn(address[] calldata accounts, uint256[] calldata amounts, uint256 totalAmount) external;
 
     /*//////////////////////////////////////////////////////////////
                               REDEMPTION

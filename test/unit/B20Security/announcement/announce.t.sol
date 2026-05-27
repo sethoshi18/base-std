@@ -140,23 +140,23 @@ contract B20SecurityAnnounceTest is B20SecurityTest {
         assertTrue(token.hasRole(B20Constants.PAUSE_ROLE, alice), "call 2 must take effect");
     }
 
-    /// @notice Verifies announce emits Announcement(caller, id, description, uri)
+    /// @notice Verifies announce emits Announcement(caller, idHash, id, description, uri)
     /// @dev Event integrity for the disclosure header. caller is indexed so consumers can
     ///      filter on operator address.
     function test_announce_success_emitsAnnouncement() public {
         _grantOperator();
-        vm.expectEmit(true, false, false, true, address(token));
-        emit IB20Security.Announcement(operator, "announce-emit", "Q3 split", "https://x.example/split");
+        vm.expectEmit(true, true, false, true, address(token));
+        emit IB20Security.Announcement(operator, keccak256(bytes("announce-emit")), "announce-emit", "Q3 split", "https://x.example/split");
         _announce(operator, new bytes[](0), "announce-emit", "Q3 split", "https://x.example/split");
     }
 
-    /// @notice Verifies announce emits EndAnnouncement(id) with the matching id
+    /// @notice Verifies announce emits EndAnnouncement(idHash, id) with the matching id
     /// @dev Event integrity for the closing marker. The id field hardens cross-tx indexing
     ///      so consumers can join open/close even when scanning logs in isolation.
     function test_announce_success_emitsEndAnnouncement(string calldata id) public {
         _grantOperator();
-        vm.expectEmit(false, false, false, true, address(token));
-        emit IB20Security.EndAnnouncement(id);
+        vm.expectEmit(true, false, false, true, address(token));
+        emit IB20Security.EndAnnouncement(keccak256(bytes(id)), id);
         _announce(operator, new bytes[](0), id, "desc", "uri");
     }
 

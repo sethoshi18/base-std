@@ -32,4 +32,15 @@ contract MockB20Stablecoin is MockB20, IB20Stablecoin {
     function currency() external view returns (string memory) {
         return MockB20StablecoinStorage.layout().currency;
     }
+
+    /// @notice Returns the URI pointing to off-chain proof-of-reserves data.
+    function reserveURI() external view returns (string memory) {
+        return MockB20StablecoinStorage.layout().reserveURI;
+    }
+
+    /// @notice Updates the reserve URI.
+    function updateReserveURI(string calldata newURI) external onlyRole(METADATA_ROLE) {
+        MockB20StablecoinStorage.layout().reserveURI = newURI;
+        emit ReserveURIUpdated();
+    }
 }

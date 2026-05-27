@@ -133,7 +133,8 @@ contract MockB20Security is MockB20, IB20Security {
         // selector check were ever weakened.
         $.usedAnnouncementIds[id] = true;
 
-        emit Announcement(msg.sender, id, description, uri);
+        bytes32 idHash = keccak256(bytes(id));
+        emit Announcement(msg.sender, idHash, id, description, uri);
 
         for (uint256 i = 0; i < internalCalls.length; i++) {
             _checkSelector(internalCalls[i]);
@@ -141,7 +142,7 @@ contract MockB20Security is MockB20, IB20Security {
             if (!success) revert InternalCallFailed(internalCalls[i]);
         }
 
-        emit EndAnnouncement(id);
+        emit EndAnnouncement(idHash, id);
     }
 
     function isAnnouncementIdUsed(string calldata id) external view returns (bool) {
@@ -173,9 +174,16 @@ contract MockB20Security is MockB20, IB20Security {
     //                  BATCHED ISSUANCE / CLAWBACK
     // ============================================================
 
-    function batchMint(address[] calldata recipients, uint256[] calldata amounts) external {
+    function batchMint(address[] calldata recipients, uint256[] calldata amounts, uint256 totalAmount) external {
         if (recipients.length != amounts.length) revert LengthMismatch(recipients.length, amounts.length);
         if (recipients.length == 0) revert EmptyBatch();
+
+        uint256 sum = 0;
+        for (uint256 i = 0; i < amounts.length; i++) {
+            sum += amounts[i];
+        }
+        if (sum != totalAmount) revert TotalAmountMismatch(totalAmount, sum);
+
         // Per-element call into _mint: role / pause checks repeat (idempotent),
         // but MINT_RECEIVER_POLICY policy and supply-cap accumulation are correctly
         // applied per recipient. Cleaner than re-deriving the per-element body.
@@ -189,7 +197,7 @@ contract MockB20Security is MockB20, IB20Security {
     ///      natspec — clawback against existing balances has no init-time
     ///      use case, so granting the factory a bypass would only widen
     ///      the attack surface.
-    function batchBurn(address[] calldata accounts, uint256[] calldata amounts)
+    function batchBurn(address[] calldata accounts, uint256[] calldata amounts, uint256 totalAmount)
         external
         onlyRoleStrict(BURN_FROM_ROLE)
     {
@@ -197,6 +205,13 @@ contract MockB20Security is MockB20, IB20Security {
             revert LengthMismatch(accounts.length, amounts.length);
         }
         if (accounts.length == 0) revert EmptyBatch();
+
+        uint256 sum = 0;
+        for (uint256 i = 0; i < amounts.length; i++) {
+            sum += amounts[i];
+        }
+        if (sum != totalAmount) revert TotalAmountMismatch(totalAmount, sum);
+
         if (_isPaused(PausableFeature.BURN)) revert ContractPaused(PausableFeature.BURN);
         for (uint256 i = 0; i < accounts.length; i++) {
             _burnRaw(accounts[i], amounts[i]);

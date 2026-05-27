@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {IB20Stablecoin} from "src/interfaces/IB20Stablecoin.sol";
+import {B20Constants} from "src/lib/B20Constants.sol";
 
 import {B20StablecoinTest} from "test/lib/B20StablecoinTest.sol";
 import {MockB20StablecoinStorage} from "test/lib/mocks/MockB20Storage.sol";
@@ -39,6 +40,23 @@ contract B20StablecoinFullLayoutTest is B20StablecoinTest {
             raw,
             _expectedStringFieldSlot(currency),
             "stablecoin currency field slot must hold the canonical string encoding"
+        );
+    }
+
+    /// @notice Verifies the variant namespace's `reserveURI` slot holds
+    ///         the canonical short/long-string encoding of the
+    ///         `reserveURI()` return.
+    function test_b20StablecoinLayout_success_reserveURISlotMatchesEncoding(string calldata uri) public {
+        _grantRole(B20Constants.METADATA_ROLE, admin);
+        vm.prank(admin);
+        IB20Stablecoin(address(token)).updateReserveURI(uri);
+
+        bytes32 raw = vm.load(address(token), MockB20StablecoinStorage.reserveURISlot());
+        string memory reserveURI = IB20Stablecoin(address(token)).reserveURI();
+        assertEq(
+            raw,
+            _expectedStringFieldSlot(reserveURI),
+            "stablecoin reserveURI field slot must hold the canonical string encoding"
         );
     }
 }

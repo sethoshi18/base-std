@@ -18,7 +18,7 @@ contract B20SecurityBatchBurnTest is B20SecurityTest {
 
         vm.prank(caller);
         vm.expectRevert(abi.encodeWithSelector(IB20.AccessControlUnauthorizedAccount.selector, caller, BURN_FROM_ROLE));
-        security().batchBurn(_singletonAddresses(alice), _singletonUints(1));
+        security().batchBurn(_singletonAddresses(alice), _singletonUints(1), 1);
     }
 
     /// @notice Verifies the factory bootstrap bypass is deliberately NOT honored for batchBurn
@@ -31,7 +31,7 @@ contract B20SecurityBatchBurnTest is B20SecurityTest {
     function test_batchBurn_revert_factoryBootstrapBypassRejected(bytes32 salt) public {
         bytes[] memory initCalls = new bytes[](1);
         initCalls[0] = abi.encodeWithSelector(
-            IB20Security.batchBurn.selector, _singletonAddresses(alice), _singletonUints(uint256(1))
+            IB20Security.batchBurn.selector, _singletonAddresses(alice), _singletonUints(uint256(1)), uint256(1)
         );
 
         vm.expectRevert(
@@ -52,7 +52,7 @@ contract B20SecurityBatchBurnTest is B20SecurityTest {
 
         vm.prank(burnFromActor);
         vm.expectRevert(abi.encodeWithSelector(IB20Security.LengthMismatch.selector, uint256(1), uint256(2)));
-        security().batchBurn(accounts, amounts);
+        security().batchBurn(accounts, amounts, 3);
     }
 
     /// @notice Verifies batchBurn reverts when both arrays are empty
@@ -61,7 +61,19 @@ contract B20SecurityBatchBurnTest is B20SecurityTest {
         _grantBurnFrom();
         vm.prank(burnFromActor);
         vm.expectRevert(IB20Security.EmptyBatch.selector);
-        security().batchBurn(new address[](0), new uint256[](0));
+        security().batchBurn(new address[](0), new uint256[](0), 0);
+    }
+
+    /// @notice Verifies batchBurn reverts when totalAmount does not match the sum of amounts
+    /// @dev TotalAmountMismatch guard: provides defense in depth against caller-side math errors.
+    function test_batchBurn_revert_totalAmountMismatch() public {
+        _grantBurnFrom();
+        address[] memory accounts = _singletonAddresses(alice);
+        uint256[] memory amounts = _singletonUints(100);
+
+        vm.prank(burnFromActor);
+        vm.expectRevert(abi.encodeWithSelector(IB20Security.TotalAmountMismatch.selector, uint256(99), uint256(100)));
+        security().batchBurn(accounts, amounts, 99);
     }
 
     /// @notice Verifies batchBurn reverts when BURN feature is paused
@@ -72,7 +84,7 @@ contract B20SecurityBatchBurnTest is B20SecurityTest {
 
         vm.prank(burnFromActor);
         vm.expectRevert(abi.encodeWithSelector(IB20.ContractPaused.selector, IB20.PausableFeature.BURN));
-        security().batchBurn(_singletonAddresses(alice), _singletonUints(amount));
+        security().batchBurn(_singletonAddresses(alice), _singletonUints(amount), amount);
     }
 
     /// @notice Verifies batchBurn surfaces per-element InsufficientBalance reverts
@@ -85,7 +97,7 @@ contract B20SecurityBatchBurnTest is B20SecurityTest {
 
         vm.prank(burnFromActor);
         vm.expectRevert(abi.encodeWithSelector(IB20.InsufficientBalance.selector, alice, uint256(0), amount));
-        security().batchBurn(_singletonAddresses(alice), _singletonUints(amount));
+        security().batchBurn(_singletonAddresses(alice), _singletonUints(amount), amount);
     }
 
     /// @notice Verifies batchBurn succeeds with a single account and debits the balance
@@ -97,7 +109,7 @@ contract B20SecurityBatchBurnTest is B20SecurityTest {
         uint256 supplyBefore = token.totalSupply();
 
         vm.prank(burnFromActor);
-        security().batchBurn(_singletonAddresses(alice), _singletonUints(amount));
+        security().batchBurn(_singletonAddresses(alice), _singletonUints(amount), amount);
 
         assertEq(token.balanceOf(alice), 0, "balance must be zero after full burn");
         assertEq(token.totalSupply(), supplyBefore - amount, "totalSupply must drop by amount");
@@ -127,7 +139,7 @@ contract B20SecurityBatchBurnTest is B20SecurityTest {
         amounts[2] = a3;
 
         vm.prank(burnFromActor);
-        security().batchBurn(accounts, amounts);
+        security().batchBurn(accounts, amounts, uint256(a1) + uint256(a2) + uint256(a3));
 
         assertEq(token.balanceOf(alice), 0, "alice balance must be zero");
         assertEq(token.balanceOf(bob), 0, "bob balance must be zero");
@@ -160,6 +172,6 @@ contract B20SecurityBatchBurnTest is B20SecurityTest {
         vm.expectEmit(true, true, false, true, address(token));
         emit IB20.Transfer(bob, address(0), 200);
         vm.prank(burnFromActor);
-        security().batchBurn(accounts, amounts);
+        security().batchBurn(accounts, amounts, 300);
     }
 }
